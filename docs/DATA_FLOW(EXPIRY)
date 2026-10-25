@@ -1,0 +1,14 @@
+Background job (every 5 min + startup):
+  1. WHERE vpn_peers.is_active = TRUE
+     AND NOT EXISTS (
+       SELECT 1 FROM entitlements e
+       WHERE e.expires_at > NOW() + 10min grace
+         AND owner ကိုက်ညီ (user XOR install)
+     )
+  2. foreach expired peer:
+     a. wgctrl RemovePeer
+     b. UPDATE vpn_peers SET is_active = FALSE
+  3. Cleanup:
+     - Revoked/expired refresh_tokens (>7d old)
+     - Used/expired email_tokens (>1d old)
+     - Stale anonymous_installs (30d inactive, no active entitlement)

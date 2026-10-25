@@ -1,0 +1,17 @@
+# Environment
+.env
+*.env
+
+# Go
+/vendor/
+*.exe
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+/bin/
+/dist/
