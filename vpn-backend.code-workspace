@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "D:/React_Projects/For_sell/PIUVPN"
+		}
+	],
+	"settings": {
+		"terminal.integrated.defaultProfile.windows": "PowerShell",
+		"terminal.integrated.env.windows": {
+			"PGPASSWORD": "8cdba378752f56b8db3a6dc6b59c37c7e801f95dab9314c16126314c21bf86cf",
+			"PGUSER": "vpn_app",
+			"PGDATABASE": "vpndb",
+			"PGHOST": "127.0.0.1",
+			"PGPORT": "5432"
+		}
+	}
+}
