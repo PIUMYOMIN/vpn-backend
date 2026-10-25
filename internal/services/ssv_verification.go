@@ -9,12 +9,13 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"sync"
 	"time"
-	"os"
-	"log"
 )
 
 const admobKeysURL = "https://www.gstatic.com/admob/reward/verifier-keys.json"
@@ -42,10 +43,19 @@ func NewSSVVerifier() *SSVVerifier {
 	}
 }
 
-// Verify checks the ECDSA signature on an AdMob SSV callback.
-func (v *SSVVerifier) Verify(query url.Values) error {
+func ssvDevSkip() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("SSV_DEV_SKIP")))
+	if v == "true" || v == "1" {
+		return true
+	}
+	// legacy misspelling from earlier local .env files
+	v = strings.ToLower(strings.TrimSpace(os.Getenv("SSV_DEV_Skip")))
+	return v == "true" || v == "1"
+}
 
-	if os.Getenv("SSV_DEV_Skip") == "true" {
+// Verify checks the ECDSA signature on an AdMob SSV callback.
+func (v *SSVVerifier) Verify(rawQuery string, query url.Values) error {
+	if ssvDevSkip() {
 		log.Printf("ssv: DEV SKIP — signature not verified")
 		return nil
 	}
@@ -69,7 +79,6 @@ func (v *SSVVerifier) Verify(query url.Values) error {
 	pubKey, ok := v.keys[keyID]
 	v.mu.RUnlock()
 	if !ok {
-		// Key might have rotated; force refresh once
 		if err := v.fetchKeys(); err != nil {
 			return fmt.Errorf("refresh keys: %w", err)
 		}
@@ -81,10 +90,8 @@ func (v *SSVVerifier) Verify(query url.Values) error {
 		}
 	}
 
-	// Rebuild message: all query params except signature and key_id, in original order
-	message := buildSSVMessage(query)
-
-	sig, err := base64.URLEncoding.DecodeString(signatureB64)
+	message := buildSSVMessage(rawQuery)
+	sig, err := decodeSSVSignature(signatureB64)
 	if err != nil {
 		return fmt.Errorf("decode signature: %w", err)
 	}
@@ -96,17 +103,49 @@ func (v *SSVVerifier) Verify(query url.Values) error {
 	return nil
 }
 
-// buildSSVMessage recreates the signed string:
-// all query parameters except "signature" and "key_id", in original order,
-// joined by "&" (URL-encoded).
-func buildSSVMessage(query url.Values) string {
-	// url.Values is a map, so we lose original order. AdMob documents the
-	// signing string as the raw query string minus signature/key_id.
-	// We must preserve order, so we parse from RawQuery.
-	// The caller should pass RawQuery; here we reconstruct from Values
-	// assuming the order is not critical for the demo. For production,
-	// pass r.URL.RawQuery and strip params manually.
-	return query.Encode()
+// buildSSVMessage keeps query params in original order, minus signature and key_id.
+func buildSSVMessage(rawQuery string) string {
+	if rawQuery == "" {
+		return ""
+	}
+	parts := strings.Split(rawQuery, "&")
+	kept := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		key := p
+		if i := strings.IndexByte(p, '='); i >= 0 {
+			key = p[:i]
+		}
+		decoded, err := url.QueryUnescape(key)
+		if err != nil {
+			decoded = key
+		}
+		if decoded == "signature" || decoded == "key_id" {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	return strings.Join(kept, "&")
+}
+
+func decodeSSVSignature(signatureB64 string) ([]byte, error) {
+	encodings := []*base64.Encoding{
+		base64.RawURLEncoding,
+		base64.URLEncoding,
+		base64.StdEncoding,
+		base64.RawStdEncoding,
+	}
+	var lastErr error
+	for _, enc := range encodings {
+		sig, err := enc.DecodeString(signatureB64)
+		if err == nil {
+			return sig, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
 }
 
 func (v *SSVVerifier) ensureKeys() error {

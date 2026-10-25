@@ -143,7 +143,8 @@ func main() {
 	mux.Handle("DELETE /api/devices/{id}", auth.RequireUser(http.HandlerFunc(deviceHandler.Delete)))
 	mux.Handle("DELETE /auth/account", auth.RequireUser(http.HandlerFunc(authHandler.DeleteAccount)))
 
-	// AdMob SSV (server-to-server; no auth header — verified by ECDSA signature)
+	// AdMob SSV is GET; accept POST too for manual tests.
+	mux.HandleFunc("GET /api/reward/ssv", rewHandler.SSVCallback)
 	mux.HandleFunc("POST /api/reward/ssv", rewHandler.SSVCallback)
 
 	// ============================================================
