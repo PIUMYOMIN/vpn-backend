@@ -218,7 +218,7 @@ func (j *ExpiryJob) cleanupStaleInstalls(ctx context.Context) error {
 
 	tag, err := j.db.Exec(ctx, `
     DELETE FROM anonymous_installs a
-    WHERE a.last_seen_at < NOW() - ($1::text || ' days')::interval
+    WHERE a.last_seen_at < NOW() - make_interval(days => $1)
       AND NOT EXISTS (
           SELECT 1 FROM entitlements e
           WHERE e.install_id = a.id
