@@ -28,27 +28,30 @@ func NewRewardHandler(db *pgxpool.Pool, ssv SSVVerifier) *RewardHandler {
 // SSVCallback is AdMob → backend (GET or POST with query params).
 // Owner is in custom_data: "user:<uuid>" or "install:<uuid>".
 // Remaining time stacks: active grant + reward hours (e.g. 12h24m + 24h → 36h24m).
+func ssvOK(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("OK"))
+}
+
 func (h *RewardHandler) SSVCallback(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-
-	// AdMob console "Verify" pings with no transaction/signature.
-	if query.Get("transaction_id") == "" || query.Get("signature") == "" {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-		return
-	}
+	log.Printf("SSV callback query=%s", r.URL.RawQuery)
 
 	transactionID := strings.TrimSpace(query.Get("transaction_id"))
 	customData, _ := url.QueryUnescape(strings.TrimSpace(query.Get("custom_data")))
-	if transactionID == "" || customData == "" {
-		respondError(w, http.StatusBadRequest, "missing_params")
+
+	// AdMob console "Verify URL" often sends signature/transaction_id
+	// without custom_data. Always 200 so Google marks the URL as valid.
+	// A real rewarded-ad callback includes custom_data (install:… or user:…).
+	if transactionID == "" || query.Get("signature") == "" || customData == "" {
+		log.Printf("SSV ping (no grant) — missing transaction, signature, or custom_data")
+		ssvOK(w)
 		return
 	}
 
 	if err := h.ssv.Verify(r.URL.RawQuery, query); err != nil {
 		log.Printf("SSV verification failed (no grant): %v", err)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
+		ssvOK(w)
 		return
 	}
 
@@ -63,8 +66,7 @@ func (h *RewardHandler) SSVCallback(w http.ResponseWriter, r *http.Request) {
 		}
 		if err == errInvalidCustomData {
 			log.Printf("SSV invalid custom_data: %q", customData)
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("OK"))
+			ssvOK(w)
 			return
 		}
 		log.Printf("SSV grant error: %v", err)
