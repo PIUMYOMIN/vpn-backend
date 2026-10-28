@@ -16,6 +16,7 @@ type Config struct {
 	JWTAccessTTL      string // e.g. "15m"
 	JWTRefreshTTL     string // e.g. "720h"
 	WGInterface       string // e.g. "wg0"
+	WGNoop            bool
 	WGServerPublicKey string
 	WGEndpoint        string
 	WGPort            int
@@ -28,6 +29,7 @@ func Load() (*Config, error) {
 	_ = godotenv.Load() // .env optional
 
 	wgPort, _ := strconv.Atoi(getEnv("WG_PORT", "51820"))
+	wgNoop, _ := strconv.ParseBool(getEnv("WG_NOOP", "false"))
 
 	cfg := &Config{
 		Port:              getEnv("PORT", "8080"),
@@ -37,6 +39,7 @@ func Load() (*Config, error) {
 		JWTAccessTTL:      getEnv("ACCESS_TOKEN_TTL", "15m"),
 		JWTRefreshTTL:     getEnv("REFRESH_TOKEN_TTL", "720h"),
 		WGInterface:       getEnv("WG_INTERFACE", "wg0"),
+		WGNoop:            wgNoop,
 		WGServerPublicKey: os.Getenv("WG_SERVER_PUBLIC_KEY"),
 		WGEndpoint:        os.Getenv("WG_ENDPOINT"),
 		WGPort:            wgPort,

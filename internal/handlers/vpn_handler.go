@@ -107,7 +107,7 @@ DNS = %s
 PublicKey = %s
 PresharedKey = %s
 Endpoint = %s:%d
-AllowedIPs = 0.0.0.0/0, ::/0
+AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 `,
 		peer.ClientPrivateKey,

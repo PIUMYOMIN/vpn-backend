@@ -13,7 +13,7 @@ CREATE TABLE entitlements (
         (user_id IS NULL AND install_id IS NOT NULL)
     ),
     CONSTRAINT entitlements_granted_by_check CHECK (
-        granted_by IN ('rewarded_ad', 'manual', 'promo')
+        granted_by IN ('rewarded_ad', 'manual', 'promo', 'fallback_free')
     )
 );
 

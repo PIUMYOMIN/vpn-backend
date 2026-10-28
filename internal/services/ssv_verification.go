@@ -127,7 +127,11 @@ func buildSSVMessage(rawQuery string) string {
 		}
 		kept = append(kept, p)
 	}
-	return strings.Join(kept, "&")
+	message, err := url.QueryUnescape(strings.Join(kept, "&"))
+	if err != nil {
+		return strings.Join(kept, "&")
+	}
+	return message
 }
 
 func decodeSSVSignature(signatureB64 string) ([]byte, error) {

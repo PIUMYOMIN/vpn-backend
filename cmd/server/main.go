@@ -73,7 +73,10 @@ func main() {
 	// --- WireGuard (real on Linux, noop on Windows/dev) ---
 	var wgSvc services.WireGuardService
 
-	if runtime.GOOS == "windows" {
+	if cfg.WGNoop {
+		log.Printf("wg: WG_NOOP=true — using NOOP (development mode)")
+		wgSvc = &services.NoopWireGuardService{}
+	} else if runtime.GOOS == "windows" {
 		log.Printf("wg: running on Windows — using NOOP (dev mode)")
 		wgSvc = &services.NoopWireGuardService{}
 	} else if cfg.WGEndpoint == "" || cfg.WGEndpoint == "placeholder" {
@@ -113,6 +116,7 @@ func main() {
 	forgotLimiter := auth.NewRateLimiter(3, 1*time.Hour)     // 3 / hour / IP
 	resetLimiter := auth.NewRateLimiter(5, 1*time.Hour)      // 5 / hour / IP
 	refreshLimiter := auth.NewRateLimiter(10, 1*time.Minute) // 10 / min / IP
+	fallbackLimiter := auth.NewRateLimiter(10, 1*time.Hour)  // 10 / hour / IP
 
 	// ============================================================
 	// 8. Routes
@@ -135,6 +139,7 @@ func main() {
 
 	// Guest OR registered user
 	mux.Handle("GET /api/entitlement", auth.RequireIdentity(http.HandlerFunc(entHandler.Get)))
+	mux.Handle("POST /api/entitlement/fallback", fallbackLimiter.Middleware(auth.RequireIdentity(http.HandlerFunc(entHandler.TryFallback))))
 	mux.Handle("GET /api/vpn/config", auth.RequireIdentity(http.HandlerFunc(vpnHandler.GetConfig)))
 
 	// User-only
